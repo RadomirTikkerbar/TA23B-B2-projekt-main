@@ -1,0 +1,157 @@
+generator client {
+  provider   = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// -----------------------------
+// ENUMS
+// -----------------------------
+enum SeatType {
+  STANDARD
+  PREMIUM
+  VIP
+}
+
+enum TicketStatus {
+  PENDING
+  PAID
+  CANCELLED
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+// -----------------------------
+// USERS (cuid primary key)
+// -----------------------------
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  password  String
+  tickets   Ticket[]
+  createdAt DateTime @default(now())
+  role      UserRole @default(USER)
+}
+
+// -----------------------------
+// MOVIES & GENRES (Int IDs)
+// -----------------------------
+model Movie {
+  id          Int          @id @default(autoincrement())
+  title       String
+  description String?
+  durationMin Int
+  basePrice   Decimal
+  posterSmall String?
+  banner      String?
+  trailer     String?
+  genre       String?
+  length      String?
+  language    String?
+  genres      MovieGenre[]
+  showtimes   Showtime[]
+}
+
+model Genre {
+  id     Int          @id @default(autoincrement())
+  name   String       @unique
+  movies MovieGenre[]
+}
+
+model MovieGenre {
+  movieId Int
+  genreId Int
+
+  movie Movie @relation(fields: [movieId], references: [id])
+  genre Genre @relation(fields: [genreId], references: [id])
+
+  @@id([movieId, genreId])
+}
+
+// -----------------------------
+// CINEMA / ROOMS / SEATS (Int IDs)
+// -----------------------------
+model Cinema {
+  id       Int     @id @default(autoincrement())
+  name     String
+  location String?
+  rooms    Room[]
+}
+
+model Room {
+  id       Int    @id @default(autoincrement())
+  cinemaId Int
+  name     String
+
+  cinema    Cinema     @relation(fields: [cinemaId], references: [id])
+  seats     Seat[]
+  showtimes Showtime[]
+}
+
+model Seat {
+  id              Int      @id @default(autoincrement())
+  roomId          Int
+  row             String
+  number          Int
+  type            SeatType
+  priceMultiplier Decimal
+
+  room       Room         @relation(fields: [roomId], references: [id])
+  TicketSeat TicketSeat[]
+
+  @@unique([roomId, row, number])
+}
+
+// -----------------------------
+// SHOWTIMES (BigInt)
+// -----------------------------
+model Showtime {
+  id             BigInt   @id @default(autoincrement())
+  movieId        Int
+  roomId         Int
+  startsAt       DateTime
+  seatMultiplier Decimal
+
+  movie Movie @relation(fields: [movieId], references: [id])
+  room  Room  @relation(fields: [roomId], references: [id])
+
+  tickets Ticket[]
+}
+
+// -----------------------------
+// TICKETS (BigInt internal ID + cuid public ID)
+// -----------------------------
+model Ticket {
+  id         BigInt       @id @default(autoincrement())
+  publicId   String       @unique @default(cuid()) // safe for public URLs
+  userId     String
+  showtimeId BigInt
+  status     TicketStatus @default(PENDING)
+  paidAt     DateTime?
+  totalPrice Decimal
+  createdAt  DateTime     @default(now())
+
+  user     User     @relation(fields: [userId], references: [id])
+  showtime Showtime @relation(fields: [showtimeId], references: [id])
+
+  seats TicketSeat[]
+}
+
+// -----------------------------
+// TICKET-SEAT LINK (BigInt + Int)
+// -----------------------------
+model TicketSeat {
+  ticketId BigInt
+  seatId   Int
+
+  ticket Ticket @relation(fields: [ticketId], references: [id])
+  seat   Seat   @relation(fields: [seatId], references: [id])
+
+  @@id([ticketId, seatId])
+}
